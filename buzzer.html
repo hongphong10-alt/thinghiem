@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Chuồng giành quyền trả lời</title>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body { background: radial-gradient(circle at 50% 18%, #22303c, #0b0f14 72%); color: #fff; font-family: 'Segoe UI', Arial, sans-serif; display: flex; align-items: center; justify-content: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; overscroll-behavior: none; }
+  #setup, #game { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; }
+  .ttl { font-size: 25px; font-weight: 900; text-align: center; color: #ffd700; }
+  .sub { font-size: 18px; opacity: 0.85; }
+  .team-btn { font-size: 25px; font-weight: 900; padding: 18px 48px; border-radius: 18px; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: #fff; }
+  .team-btn:active { transform: scale(0.95); }
+  .badge { font-size: 20px; font-weight: 900; letter-spacing: 2px; background: rgba(255,215,0,0.15); border: 2px solid rgba(255,215,0,0.5); color: #ffd700; padding: 8px 22px; border-radius: 999px; }
+  #bigBtn { width: min(72vw, 320px); aspect-ratio: 1; border-radius: 50%; border: 10px solid #7a1010; background: radial-gradient(circle at 35% 30%, #ff6b6b, #c62828 60%, #8e0000); color: #fff; font-size: clamp(22px, 6vw, 34px); font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,0.6), inset 0 -10px 24px rgba(0,0,0,0.35); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; transition: transform 0.08s ease; }
+  #bigBtn.pressed { transform: scale(0.92); }
+  #bigBtn.locked { filter: grayscale(0.9) brightness(0.55); }
+  #bigBtn .bell { font-size: clamp(34px, 9vw, 52px); }
+  .st { font-size: 16px; opacity: 0.9; }
+  .st2 { font-size: 19px; font-weight: 800; color: #ffd700; min-height: 26px; text-align: center; }
+</style>
+</head>
+<body>
+  <div id="setup">
+    <div class="ttl">🔔 Chuồng giành quyền trả lời</div>
+    <div class="sub">Chọn đội của bạn:</div>
+    <button class="team-btn" onclick="pickTeam('A')">ĐỘI A</button>
+    <button class="team-btn" onclick="pickTeam('B')">ĐỘI B</button>
+  </div>
+  <div id="game" style="display:none">
+    <div class="badge" id="myBadge">ĐỘI A</div>
+    <button id="bigBtn"><span class="bell">🔔</span><span>BẤM<br>CHUỒNG</span></button>
+    <div class="st" id="st">🟡 Đang kết nối...</div>
+    <div class="st2" id="st2"></div>
+  </div>
+<script>
+const TOPIC = 'hoithi-chungkhao-buzzer-2026';
+const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+let myTeam = null, client = null, connected = false, locked = false, winner = null, bIdx = 0;
+const stEl = document.getElementById('st'), st2El = document.getElementById('st2'), btn = document.getElementById('bigBtn');
+function setSt() {
+  if (typeof mqtt === 'undefined') { stEl.textContent = '⚠ Lổi thư viện'; return; }
+  stEl.textContent = connected ? '🟢 Đã kết nối' : '🟡 Đang kết nối...';
+}
+function setSt2(t) { st2El.textContent = t || ''; }
+function publish(o) { try { if (client && connected) client.publish(TOPIC, JSON.stringify(o)); } catch (e) {} }
+function pickTeam(t) {
+  myTeam = t;
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').style.display = 'flex';
+  document.getElementById('myBadge').textContent = 'ĐỘI ' + t;
+  connect();
+}
+function connect() {
+  if (typeof mqtt === 'undefined') { setSt(); return; }
+  if (client) return;
+  try {
+    client = mqtt.connect(BROKERS[bIdx % BROKERS.length], { clientId: 'CHUỒNG-' + Math.random().toString(16).slice(2), reconnectPeriod: 4000, connectTimeout: 8000 });
+  } catch (e) { nextBroker(); return; }
+  client.on('connect', () => { connected = true; setSt(); try { client.subscribe(TOPIC); } catch (e) {} });
+  client.on('close', () => { connected = false; setSt(); });
+  client.on('offline', () => { connected = false; setSt(); });
+  client.on('reconnect', () => { connected = false; setSt(); });
+  client.on('error', () => { try { client.end(true); } catch (e) {} client = null; connected = false; nextBroker(); });
+  client.on('message', (topic, msg) => {
+    let d = null;
+    try { d = JSON.parse(msg.toString()); } catch (e) { return; }
+    if (!d) return;
+    if (d.action === 'lock') {
+      winner = d.team;
+      locked = (d.team === myTeam);
+      if (locked) { setSt2('Bạn giành quyền trả lời!'); }
+      else { setSt2('Đội ' + d.team + ' giành quyền'); }
+      btn.classList.add('locked');
+    } else if (d.action === 'reject') {
+      if (winner === myTeam) return;
+      locked = false;
+      btn.classList.remove('locked');
+      setSt2('Chưa được! Chờ cơ hội...');
+    } else if (d.action === 'reset') {
+      winner = null; locked = false;
+      btn.classList.remove('locked');
+      setSt2('');
+    }
+  });
+}
+function nextBroker() { bIdx++; setTimeout(connect, 1500); }
+btn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  btn.classList.add('pressed');
+  if (!myTeam) return;
+  if (locked) { navigator.vibrate && navigator.vibrate(120); return; }
+  if (!connected) { setSt2('Chưa kết nối!'); return; }
+  publish({ action: 'buzz', team: myTeam, id: myTeam + '-' + Date.now() + '-' + Math.random().toString(16).slice(2) });
+  navigator.vibrate && navigator.vibrate(80);
+  setSt2('Đã gửi! Chờ kết quả...');
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => btn.addEventListener(ev, () => btn.classList.remove('pressed')));
+</script>
+</body>
+</html>

@@ -897,7 +897,21 @@
     text-shadow: 0 1px 4px rgba(0,0,0,0.8);
     padding: 0 16px;
   }
-</style>
+  /* Chuong gianh quyen (2 dien thoai) */
+  .buzz-panel { width: min(880px, 96%); display: flex; align-items: stretch; justify-content: center; gap: 14px; margin: 0 auto 10px; flex-shrink: 0; }
+  .buzz-team { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 8px 14px; transition: all 0.25s ease; }
+  .buzz-name { font-size: clamp(18px, 2.2vw, 28px); font-weight: 900; letter-spacing: 2px; color: #fff; }
+  .buzz-lamp { font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
+  .buzz-team.lit { border-color: #ffd700; background: rgba(255,215,0,0.16); animation: buzzPulse 1s ease-in-out infinite; }
+  .buzz-team.lit .buzz-lamp { filter: none; text-shadow: 0 0 18px rgba(255,215,0,0.95); }
+  @keyframes buzzPulse { 0%, 100% { box-shadow: 0 0 16px rgba(255,215,0,0.4); } 50% { box-shadow: 0 0 32px rgba(255,215,0,0.85); } }
+  .buzz-status { align-self: center; font-size: clamp(12px, 1.4vw, 16px); color: rgba(255,255,255,0.75); white-space: nowrap; }
+  .buzz-banner { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-160%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #ffe27a, #ffb300); color: #1a1a1a; font-weight: 900; font-size: clamp(18px, 2.4vw, 32px); padding: 12px 30px; border-radius: 999px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 30px rgba(255,215,0,0.7); transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); pointer-events: none; white-space: nowrap; }
+  .buzz-banner.show { transform: translateX(-50%) translateY(0); }
+  .buzz-banner-bell { display: inline-block; animation: bellShake 0.5s ease-in-out infinite; }
+  @keyframes bellShake { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+  </style>
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 </head>
 <body>
 
@@ -975,6 +989,11 @@
   </div>
 
   <div class="question-area">
+    <div class="buzz-panel" id="buzzPanel">
+      <div class="buzz-team" id="buzzTeamA"><span class="buzz-lamp">💡</span><span class="buzz-name">ĐỘI A</span></div>
+      <div class="buzz-status" id="buzzStatus">🟡 Chuồng: đang kết nối...</div>
+      <div class="buzz-team" id="buzzTeamB"><span class="buzz-name">ĐỘI B</span><span class="buzz-lamp">💡</span></div>
+    </div>
     <div class="q-counter">
       <div class="q-label">CÂU HỎI SỐ</div>
       <div class="q-num" id="qNum">1</div>
@@ -997,6 +1016,7 @@
   </div>
 </div>
 
+<div class="buzz-banner" id="buzzBanner"><span class="buzz-banner-bell">🔔</span><span id="buzzBannerText"></span></div>
 <div class="confetti-layer" id="confettiLayer"></div>
 
 <!-- Dòng bản quyền -->
@@ -1035,6 +1055,17 @@ let wrongPicks = [];       // các đáp án đã chọn sai (ngầm)
 let isAnswered = false;
 let strikeCount = 0;       // đếm ngầm, không hiển thị (sai 2 lần → hiện đáp án)
 let answerLog = {};
+let buzzClient = null;
+let buzzBrokerIdx = 0;
+let buzzConnected = false;
+let buzzLock = false;
+let buzzBannerTimer = null;
+const BUZZ_TOPIC = 'hoithi-chungkhao-buzzer-2026';
+const BUZZ_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+const BUZZ_WIN_TEXT = 'ĐỘI X GIÀNH QUYỀN TRẢ LỜI!';
+const BUZZ_TXT_OK = '🟢 Chuồng: đà kết nối';
+const BUZZ_TXT_WAIT = '🟡 Chuồng: đang kết nối...';
+const BUZZ_TXT_ERR = '⚠ Chuồng: lổi thư viện';
 let finishAnswerTimer = null;
 let finishWaitTimer = null;
 let randomSession = 0;
@@ -1139,6 +1170,13 @@ function soundClick() {
   playSFX('btnClick', 0.7, 0.45); // cắt còn 0.45s - đủ nhấn mà không lê thê
 }
 
+function soundBuzzBell() {
+  if (!soundEnabled || audioMuted) return;
+  playTone(880, 0.18, 'square', 0.14);
+  setTimeout(() => playTone(660, 0.3, 'square', 0.14), 180);
+  setTimeout(() => playTone(880, 0.18, 'square', 0.12), 520);
+  setTimeout(() => playTone(660, 0.3, 'square', 0.12), 700);
+}
 function soundReveal() {
   if (!soundEnabled) return;
   const ctx = getAudioCtx(); if (!ctx) return;
@@ -1226,6 +1264,7 @@ function renderQuestion() {
   wrongPicks = rec ? rec.wrongs.slice() : [];
   isAnswered = rec ? rec.answered : false;
   strikeCount = wrongPicks.length;
+  buzzReset();
   if (rec) {
     const opts = grid.querySelectorAll('.opt');
     if (rec.answered) {
@@ -1267,6 +1306,7 @@ function pickAnswer(idx) {
   wrongPicks.push(idx);
   strikeCount++;
   answerLog[currentSet + '-' + currentIdx] = { wrongs: wrongPicks.slice(), answered: false };
+  buzzUnlockForSteal();
   const opts = document.querySelectorAll('.opt');
   opts[idx].classList.add('picked-wrong');
   soundWrong();
@@ -2193,6 +2233,87 @@ function initFlagWaves() {
   };
 }
 
+// ============ CHUONG GIANNH QUYEN (2 dien thoai qua internet) ============
+function buzzStatusUpdate() {
+  const el = document.getElementById('buzzStatus');
+  if (!el) return;
+  if (typeof mqtt === 'undefined') { el.textContent = BUZZ_TXT_ERR; return; }
+  el.textContent = buzzConnected ? BUZZ_TXT_OK : BUZZ_TXT_WAIT;
+}
+function buzzPublish(obj) {
+  try { if (buzzClient && buzzConnected) buzzClient.publish(BUZZ_TOPIC, JSON.stringify(obj)); } catch (e) {}
+}
+function buzzNextBroker() {
+  buzzBrokerIdx++;
+  buzzClient = null;
+  buzzConnected = false;
+  buzzStatusUpdate();
+  setTimeout(buzzConnect, 1500);
+}
+function buzzConnect() {
+  if (typeof mqtt === 'undefined') { buzzStatusUpdate(); return; }
+  if (buzzClient) return;
+  const url = BUZZ_BROKERS[buzzBrokerIdx % BUZZ_BROKERS.length];
+  try {
+    buzzClient = mqtt.connect(url, { clientId: 'manhinh-' + Math.random().toString(16).slice(2), reconnectPeriod: 4000, connectTimeout: 8000 });
+  } catch (e) { buzzNextBroker(); return; }
+  buzzClient.on('connect', () => {
+    buzzConnected = true;
+    buzzStatusUpdate();
+    try { buzzClient.subscribe(BUZZ_TOPIC); } catch (e) {}
+  });
+  buzzClient.on('close', () => { buzzConnected = false; buzzStatusUpdate(); });
+  buzzClient.on('offline', () => { buzzConnected = false; buzzStatusUpdate(); });
+  buzzClient.on('reconnect', () => { buzzConnected = false; buzzStatusUpdate(); });
+  buzzClient.on('error', () => { buzzNextBroker(); });
+  buzzClient.on('message', (topic, msg) => {
+    let d = null;
+    try { d = JSON.parse(msg.toString()); } catch (e) { return; }
+    if (d && d.action === 'buzz') buzzHandle(d);
+  });
+}
+function buzzHandle(d) {
+  if (!d.team) return;
+  if (!quizActive || isAnswered || buzzLock) { buzzPublish({ action: 'reject' }); return; }
+  buzzWin(d.team);
+}
+function buzzWin(team) {
+  buzzLock = true;
+  const card = document.getElementById(team === 'A' ? 'buzzTeamA' : 'buzzTeamB');
+  const other = document.getElementById(team === 'A' ? 'buzzTeamB' : 'buzzTeamA');
+  if (card) card.classList.add('lit');
+  if (other) other.classList.remove('lit');
+  const banner = document.getElementById('buzzBanner');
+  const text = document.getElementById('buzzBannerText');
+  if (banner && text) {
+    text.textContent = BUZZ_WIN_TEXT.replace('X', team);
+    banner.classList.add('show');
+    if (buzzBannerTimer) clearTimeout(buzzBannerTimer);
+    buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 4500);
+  }
+  soundBuzzBell();
+  buzzPublish({ action: 'lock', team: team });
+}
+function buzzClearLamps() {
+  ['buzzTeamA', 'buzzTeamB'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('lit');
+  });
+  const banner = document.getElementById('buzzBanner');
+  if (banner) banner.classList.remove('show');
+}
+function buzzReset() {
+  buzzLock = false;
+  buzzClearLamps();
+  buzzPublish({ action: 'reset' });
+}
+function buzzUnlockForSteal() {
+  if (!buzzLock) return;
+  buzzLock = false;
+  buzzClearLamps();
+  buzzPublish({ action: 'reset' });
+}
+buzzConnect();
 initFlagWaves();
 createBgAnim();
 </script>
