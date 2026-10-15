@@ -904,9 +904,9 @@
   .buzz-score { min-width: 46px; text-align: center; font-size: clamp(18px, 2vw, 26px); font-weight: 900; color: #ffd700; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,215,0,0.45); border-radius: 12px; padding: 4px 10px; margin-left: 6px; }
   .buzz-lamp { font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
   .buzz-team.lit { border-color: #ff3b30; background: rgba(255,59,48,0.16); animation: beaconFlash 0.45s ease-in-out infinite; }
-  .buzz-team.lit .buzz-lamp { filter: none; animation: beaconSpin 0.45s ease-in-out infinite; }
+  .buzz-team.lit .buzz-lamp { filter: none; animation: beaconSpin 0.45s linear infinite; }
   @keyframes beaconFlash { 0%, 100% { box-shadow: 0 0 12px rgba(255,30,30,0.5); background: rgba(255,59,48,0.1); } 50% { box-shadow: 0 0 44px rgba(255,30,30,1); background: rgba(255,59,48,0.32); } }
-  @keyframes beaconSpin { 0%, 100% { text-shadow: 0 0 8px rgba(255,60,60,0.8); transform: scale(1); } 50% { text-shadow: 0 0 26px rgba(255,60,60,1); transform: scale(1.14); } }
+  @keyframes beaconSpin { from { transform: rotate(0deg); text-shadow: 0 0 10px rgba(255,40,40,0.9); } to { transform: rotate(360deg); text-shadow: 0 0 24px rgba(255,40,40,1); } }
   .buzz-status { align-self: center; font-size: clamp(12px, 1.4vw, 16px); color: rgba(255,255,255,0.75); white-space: nowrap; }
   .buzz-banner { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-160%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #ffe27a, #ffb300); color: #1a1a1a; font-weight: 900; font-size: clamp(18px, 2.4vw, 32px); padding: 12px 30px; border-radius: 999px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 30px rgba(255,215,0,0.7); transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); pointer-events: none; white-space: nowrap; }
   .buzz-banner.show { transform: translateX(-50%) translateY(0); }
@@ -1063,7 +1063,10 @@ let buzzConnected = false;
 let buzzLock = false;
 let buzzTeam = null;
 let buzzRingTimer = null;
+let buzzSirenOsc = null;
+let buzzSirenGain = null;
 const buzzScore = { A: 0, B: 0 };
+const BUZZ_PASS_TEXT = 'ĐỘI X TRẢ LỜI TIẾP!';
 let buzzBannerTimer = null;
 const BUZZ_TOPIC = 'hoithi-chungkhao-buzzer-2026';
 const BUZZ_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
@@ -1183,14 +1186,41 @@ function soundBuzzBell() {
   setTimeout(() => playTone(660, 0.3, 'square', 0.12), 700);
 }
 function soundBuzzRingStart() {
-  if (buzzRingTimer) return;
-  buzzRingTimer = setInterval(() => {
-    playTone(1175, 0.09, 'square', 0.11);
-    setTimeout(() => playTone(988, 0.11, 'square', 0.1), 90);
-  }, 620);
+  soundBuzzRingStop();
+  if (!soundEnabled || audioMuted) return;
+  const ctx = getAudioCtx(); if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(700, ctx.currentTime);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.17, ctx.currentTime + 0.06);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start();
+  buzzSirenOsc = osc; buzzSirenGain = gain;
+  const wail = () => {
+    if (!buzzSirenOsc || audioMuted) { soundBuzzRingStop(); return; }
+    const t = ctx.currentTime;
+    buzzSirenOsc.frequency.cancelScheduledValues(t);
+    buzzSirenOsc.frequency.setValueAtTime(700, t);
+    buzzSirenOsc.frequency.exponentialRampToValueAtTime(1400, t + 0.42);
+    buzzSirenOsc.frequency.exponentialRampToValueAtTime(700, t + 0.84);
+  };
+  wail();
+  buzzRingTimer = setInterval(wail, 840);
 }
 function soundBuzzRingStop() {
   if (buzzRingTimer) { clearInterval(buzzRingTimer); buzzRingTimer = null; }
+  if (buzzSirenOsc) {
+    try {
+      const t = getAudioCtx().currentTime;
+      buzzSirenGain.gain.cancelScheduledValues(t);
+      buzzSirenGain.gain.setValueAtTime(Math.max(buzzSirenGain.gain.value, 0.0001), t);
+      buzzSirenGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      buzzSirenOsc.stop(t + 0.18);
+    } catch (e) {}
+    buzzSirenOsc = null; buzzSirenGain = null;
+  }
 }
 function soundReveal() {
   if (!soundEnabled) return;
@@ -1323,8 +1353,11 @@ function pickAnswer(idx) {
   wrongPicks.push(idx);
   strikeCount++;
   answerLog[currentSet + '-' + currentIdx] = { wrongs: wrongPicks.slice(), answered: false };
-  buzzUnlockForSteal();
-  soundBuzzRingStop();
+  if (strikeCount < 2) {
+    buzzPassTurn();
+  } else {
+    soundBuzzRingStop();
+  }
   const opts = document.querySelectorAll('.opt');
   opts[idx].classList.add('picked-wrong');
   soundWrong();
@@ -2311,7 +2344,6 @@ function buzzWin(team) {
     if (buzzBannerTimer) clearTimeout(buzzBannerTimer);
     buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 4500);
   }
-  soundBuzzBell();
   soundBuzzRingStart();
   buzzPublish({ action: 'lock', team: team });
 }
@@ -2341,11 +2373,25 @@ function buzzReset() {
   buzzClearLamps();
   buzzPublish({ action: 'reset' });
 }
-function buzzUnlockForSteal() {
-  if (!buzzLock) return;
-  buzzLock = false;
-  buzzClearLamps();
-  buzzPublish({ action: 'reset' });
+function buzzPassTurn() {
+  if (!buzzTeam) return;
+  const other = buzzTeam === 'A' ? 'B' : 'A';
+  const cur = document.getElementById(buzzTeam === 'A' ? 'buzzTeamA' : 'buzzTeamB');
+  const nxt = document.getElementById(other === 'A' ? 'buzzTeamA' : 'buzzTeamB');
+  if (cur) cur.classList.remove('lit');
+  if (nxt) nxt.classList.add('lit');
+  buzzTeam = other;
+  soundBuzzRingStop();
+  soundBuzzRingStart();
+  const banner = document.getElementById('buzzBanner');
+  const text = document.getElementById('buzzBannerText');
+  if (banner && text) {
+    text.textContent = BUZZ_PASS_TEXT.replace('X', other);
+    banner.classList.add('show');
+    if (buzzBannerTimer) clearTimeout(buzzBannerTimer);
+    buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 3500);
+  }
+  buzzPublish({ action: 'lock', team: other });
 }
 buzzConnect();
 initFlagWaves();
