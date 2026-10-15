@@ -39,7 +39,7 @@
 <script>
 const TOPIC = 'hoithi-chungkhao-buzzer-2026';
 const BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
-let myTeam = null, client = null, connected = false, locked = false, winner = null, bIdx = 0;
+let myTeam = null, client = null, connected = false, locked = false, winner = null, bIdx = 0, hiTimer = null;
 const stEl = document.getElementById('st'), st2El = document.getElementById('st2'), btn = document.getElementById('bigBtn');
 function setSt() {
   if (typeof mqtt === 'undefined') { stEl.textContent = '⚠ Lổi thư viện'; return; }
@@ -54,13 +54,14 @@ function pickTeam(t) {
   document.getElementById('myBadge').textContent = 'ĐỘI ' + t;
   connect();
 }
+function publishHi() { publish({ action: 'hi', team: myTeam }); }
 function connect() {
   if (typeof mqtt === 'undefined') { setSt(); return; }
   if (client) return;
   try {
     client = mqtt.connect(BROKERS[bIdx % BROKERS.length], { clientId: 'CHUỒNG-' + Math.random().toString(16).slice(2), reconnectPeriod: 4000, connectTimeout: 8000 });
   } catch (e) { nextBroker(); return; }
-  client.on('connect', () => { connected = true; setSt(); try { client.subscribe(TOPIC); } catch (e) {} });
+  client.on('connect', () => { connected = true; setSt(); try { client.subscribe(TOPIC); } catch (e) {} if (!hiTimer) { publishHi(); hiTimer = setInterval(publishHi, 3000); } });
   client.on('close', () => { connected = false; setSt(); });
   client.on('offline', () => { connected = false; setSt(); });
   client.on('reconnect', () => { connected = false; setSt(); });

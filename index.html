@@ -904,7 +904,7 @@
   .buzz-score { min-width: 46px; text-align: center; font-size: clamp(18px, 2vw, 26px); font-weight: 900; color: #ffd700; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,215,0,0.45); border-radius: 12px; padding: 4px 10px; margin-left: 6px; }
   .buzz-lamp { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
   .lamp-emoji { position: relative; z-index: 1; }
-  .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(from 90deg, rgba(255,45,45,0.9), rgba(255,45,45,0) 22%, rgba(255,45,45,0.55) 50%, rgba(255,45,45,0) 72%, rgba(255,45,45,0.9)); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
+  .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(rgba(0,0,0,0) 0deg, rgba(0,0,0,0) 55deg, rgba(255,45,45,0.95) 78deg, rgba(255,45,45,0.5) 90deg, rgba(255,45,45,0.95) 102deg, rgba(0,0,0,0) 125deg, rgba(0,0,0,0) 235deg, rgba(255,45,45,0.95) 258deg, rgba(255,45,45,0.5) 270deg, rgba(255,45,45,0.95) 282deg, rgba(0,0,0,0) 305deg); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
   .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.7s ease-in-out infinite; }
   .buzz-team.lit .buzz-lamp { filter: none; }
   .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.7s linear infinite, beamHue 0.7s steps(1) infinite; }
@@ -1064,6 +1064,7 @@ let answerLog = {};
 let buzzClient = null;
 let buzzBrokerIdx = 0;
 let buzzConnected = false;
+let buzzLastSeen = { A: 0, B: 0 };
 let buzzLock = false;
 let buzzTeam = null;
 let buzzRingTimer = null;
@@ -1074,6 +1075,10 @@ const BUZZ_PASS_TEXT = 'ĐỘI X TRẢ LỜI TIẾP!';
 let buzzBannerTimer = null;
 const BUZZ_TOPIC = 'hoithi-chungkhao-buzzer-2026';
 const BUZZ_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+const BUZZ_TXT_BOTH = '🟢 Chuồng: 2 đội đà kết nối';
+const BUZZ_TXT_A = '🟢 Chuồng: ĐỘI A đà kết nối';
+const BUZZ_TXT_B = '🟢 Chuồng: ĐỘI B đà kết nối';
+const BUZZ_TXT_NONE = '🟡 Chuồng: chưa cô đội kết nối';
 const BUZZ_WIN_TEXT = 'ĐỘI X GIÀNH QUYỀN TRẢ LỜI!';
 const BUZZ_TXT_OK = '🟢 Chuồng: đà kết nối';
 const BUZZ_TXT_WAIT = '🟡 Chuồng: đang kết nối...';
@@ -2296,7 +2301,14 @@ function buzzStatusUpdate() {
   const el = document.getElementById('buzzStatus');
   if (!el) return;
   if (typeof mqtt === 'undefined') { el.textContent = BUZZ_TXT_ERR; return; }
-  el.textContent = buzzConnected ? BUZZ_TXT_OK : BUZZ_TXT_WAIT;
+  if (!buzzConnected) { el.textContent = BUZZ_TXT_WAIT; return; }
+  const now = Date.now();
+  const a = (now - buzzLastSeen.A) < 8000;
+  const b = (now - buzzLastSeen.B) < 8000;
+  if (a && b) { el.textContent = BUZZ_TXT_BOTH; }
+  else if (a) { el.textContent = BUZZ_TXT_A; }
+  else if (b) { el.textContent = BUZZ_TXT_B; }
+  else { el.textContent = BUZZ_TXT_NONE; }
 }
 function buzzPublish(obj) {
   try { if (buzzClient && buzzConnected) buzzClient.publish(BUZZ_TOPIC, JSON.stringify(obj)); } catch (e) {}
@@ -2327,7 +2339,9 @@ function buzzConnect() {
   buzzClient.on('message', (topic, msg) => {
     let d = null;
     try { d = JSON.parse(msg.toString()); } catch (e) { return; }
-    if (d && d.action === 'buzz') buzzHandle(d);
+    if (!d) return;
+    if (d.action === 'hi' && d.team) { buzzLastSeen[d.team] = Date.now(); return; }
+    if (d.action === 'buzz') buzzHandle(d);
   });
 }
 function buzzHandle(d) {
@@ -2399,6 +2413,7 @@ function buzzPassTurn() {
   buzzPublish({ action: 'lock', team: other });
 }
 buzzConnect();
+setInterval(buzzStatusUpdate, 1000);
 initFlagWaves();
 createBgAnim();
 </script>
