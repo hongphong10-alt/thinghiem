@@ -905,11 +905,12 @@
   .buzz-lamp { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
   .lamp-emoji { position: relative; z-index: 1; }
   .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255,45,45,0.9), rgba(255,45,45,0) 22%, rgba(255,45,45,0.55) 50%, rgba(255,45,45,0) 72%, rgba(255,45,45,0.9)); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
-  .buzz-team.lit { border-color: #ff3b30; background: rgba(255,59,48,0.16); animation: beaconFlash 0.45s ease-in-out infinite; }
+  .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.9s ease-in-out infinite; }
   .buzz-team.lit .buzz-lamp { filter: none; }
-  .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.45s linear infinite; }
-  @keyframes beaconFlash { 0%, 100% { box-shadow: 0 0 12px rgba(255,30,30,0.5); background: rgba(255,59,48,0.1); } 50% { box-shadow: 0 0 44px rgba(255,30,30,1); background: rgba(255,59,48,0.32); } }
+  .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.9s linear infinite, beamHue 0.9s steps(1) infinite; }
+  @keyframes beaconFlash { 0%, 100% { border-color: #ff3b30; box-shadow: 0 0 14px rgba(255,40,40,0.6); background: rgba(255,59,48,0.12); } 50% { border-color: #2f7bff; box-shadow: 0 0 38px rgba(47,123,255,0.95); background: rgba(47,123,255,0.22); } }
   @keyframes beamSpin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+  @keyframes beamHue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(240deg); } }
   .buzz-status { align-self: center; font-size: clamp(12px, 1.4vw, 16px); color: rgba(255,255,255,0.75); white-space: nowrap; }
   .buzz-banner { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-160%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #ffe27a, #ffb300); color: #1a1a1a; font-weight: 900; font-size: clamp(18px, 2.4vw, 32px); padding: 12px 30px; border-radius: 999px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 30px rgba(255,215,0,0.7); transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); pointer-events: none; white-space: nowrap; }
   .buzz-banner.show { transform: translateX(-50%) translateY(0); }
@@ -1066,8 +1067,7 @@ let buzzConnected = false;
 let buzzLock = false;
 let buzzTeam = null;
 let buzzRingTimer = null;
-let buzzSirenOsc = null;
-let buzzSirenGain = null;
+let buzzSirenNodes = [];
 let buzzSirenStopTimer = null;
 const buzzScore = { A: 0, B: 0 };
 const BUZZ_PASS_TEXT = 'ĐỘI X TRẢ LỜI TIẾP!';
@@ -1193,39 +1193,39 @@ function soundBuzzRingStart() {
   soundBuzzRingStop();
   if (!soundEnabled || audioMuted) return;
   const ctx = getAudioCtx(); if (!ctx) return;
-  const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(700, ctx.currentTime);
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.17, ctx.currentTime + 0.06);
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.start();
-  buzzSirenOsc = osc; buzzSirenGain = gain;
-  const wail = () => {
-    if (!buzzSirenOsc || audioMuted) { soundBuzzRingStop(); return; }
-    const t = ctx.currentTime;
-    buzzSirenOsc.frequency.cancelScheduledValues(t);
-    buzzSirenOsc.frequency.setValueAtTime(700, t);
-    buzzSirenOsc.frequency.exponentialRampToValueAtTime(1400, t + 0.42);
-    buzzSirenOsc.frequency.exponentialRampToValueAtTime(700, t + 0.84);
-  };
-  wail();
-  buzzRingTimer = setInterval(wail, 840);
+  const o1 = ctx.createOscillator();
+  const o2 = ctx.createOscillator();
+  const tr = ctx.createOscillator();
+  const tg = ctx.createGain();
+  o1.type = 'square'; o1.frequency.value = 1180;
+  o2.type = 'square'; o2.frequency.value = 985;
+  tr.type = 'sine'; tr.frequency.value = 22;
+  tg.gain.value = 0.07;
+  gain.gain.setValueAtTime(0.08, ctx.currentTime);
+  tr.connect(tg); tg.connect(gain.gain);
+  o1.connect(gain); o2.connect(gain);
+  gain.connect(ctx.destination);
+  o1.start(); o2.start(); tr.start();
+  buzzSirenNodes = [o1, o2, tr, gain];
+  buzzRingTimer = setInterval(() => { if (audioMuted) soundBuzzRingStop(); }, 200);
   buzzSirenStopTimer = setTimeout(soundBuzzRingStop, 3000);
 }
 function soundBuzzRingStop() {
   if (buzzRingTimer) { clearInterval(buzzRingTimer); buzzRingTimer = null; }
   if (buzzSirenStopTimer) { clearTimeout(buzzSirenStopTimer); buzzSirenStopTimer = null; }
-  if (buzzSirenOsc) {
+  if (buzzSirenNodes && buzzSirenNodes.length) {
     try {
+      const g = buzzSirenNodes[3];
       const t = getAudioCtx().currentTime;
-      buzzSirenGain.gain.cancelScheduledValues(t);
-      buzzSirenGain.gain.setValueAtTime(Math.max(buzzSirenGain.gain.value, 0.0001), t);
-      buzzSirenGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-      buzzSirenOsc.stop(t + 0.18);
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+      buzzSirenNodes[0].stop(t + 0.15);
+      buzzSirenNodes[1].stop(t + 0.15);
+      buzzSirenNodes[2].stop(t + 0.15);
     } catch (e) {}
-    buzzSirenOsc = null; buzzSirenGain = null;
+    buzzSirenNodes = [];
   }
 }
 function soundReveal() {
