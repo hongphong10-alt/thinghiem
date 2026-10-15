@@ -904,10 +904,10 @@
   .buzz-score { min-width: 46px; text-align: center; font-size: clamp(18px, 2vw, 26px); font-weight: 900; color: #ffd700; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,215,0,0.45); border-radius: 12px; padding: 4px 10px; margin-left: 6px; }
   .buzz-lamp { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
   .lamp-emoji { position: relative; z-index: 1; }
-  .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(from 0deg, rgba(255,45,45,0.9), rgba(255,45,45,0) 22%, rgba(255,45,45,0.55) 50%, rgba(255,45,45,0) 72%, rgba(255,45,45,0.9)); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
-  .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.9s ease-in-out infinite; }
+  .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(from 90deg, rgba(255,45,45,0.9), rgba(255,45,45,0) 22%, rgba(255,45,45,0.55) 50%, rgba(255,45,45,0) 72%, rgba(255,45,45,0.9)); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
+  .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.7s ease-in-out infinite; }
   .buzz-team.lit .buzz-lamp { filter: none; }
-  .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.9s linear infinite, beamHue 0.9s steps(1) infinite; }
+  .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.7s linear infinite, beamHue 0.7s steps(1) infinite; }
   @keyframes beaconFlash { 0%, 100% { border-color: #ff3b30; box-shadow: 0 0 14px rgba(255,40,40,0.6); background: rgba(255,59,48,0.12); } 50% { border-color: #2f7bff; box-shadow: 0 0 38px rgba(47,123,255,0.95); background: rgba(47,123,255,0.22); } }
   @keyframes beamSpin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
   @keyframes beamHue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(240deg); } }
