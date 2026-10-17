@@ -916,7 +916,49 @@
   .buzz-banner.show { transform: translateX(-50%) translateY(0); }
   .buzz-banner-bell { display: inline-block; animation: bellShake 0.5s ease-in-out infinite; }
   @keyframes bellShake { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
-  </style>
+    .buzzer-overlay {
+    position: fixed; inset: 0; z-index: 185;
+    display: none; align-items: center; justify-content: center;
+    padding: 14px; overflow-y: auto;
+    background: radial-gradient(circle at 50% 30%, rgba(46, 4, 12, 0.95), rgba(18, 1, 4, 0.98));
+    backdrop-filter: blur(20px);
+  }
+  .buzzer-overlay.show { display: flex; }
+  .buzzer-card {
+    background: linear-gradient(135deg, rgba(66, 0, 8, 0.8) 0%, rgba(26, 1, 5, 0.9) 100%);
+    border: 2px solid var(--gold);
+    border-radius: 28px;
+    padding: clamp(24px, 3.5vh, 44px) clamp(28px, 4vw, 56px);
+    text-align: center;
+    max-width: 720px; width: 92%;
+    box-shadow: 0 0 0 6px rgba(248,192,36,0.18), 0 20px 70px rgba(0,0,0,0.8);
+    position: relative; margin: auto; max-height: 96vh; overflow-y: auto;
+    animation: cardAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .buzzer-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+  .buzzer-title { color: var(--gold); font-size: clamp(18px, 2.2vw, 26px); font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+  .buzzer-sub { color: rgba(255,255,255,0.8); font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+  .buzzer-body { display: flex; gap: 22px; align-items: flex-start; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+  .buzzer-qr-wrap { background: #fff; border-radius: 16px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .buzzer-qr { width: 170px; height: 170px; display: block; }
+  .buzzer-link { color: #333; font-size: 11px; word-break: break-all; margin-top: 6px; max-width: 190px; }
+  .buzzer-status-col { display: flex; flex-direction: column; gap: 10px; min-width: 240px; }
+  .buzzer-team-row { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 16px; }
+  .buz-dot { font-size: 20px; }
+  .buz-team-label { color: #fff; font-weight: 800; font-size: 15px; }
+  .buz-team-state { color: rgba(255,255,255,0.6); font-size: 13px; margin-left: auto; }
+  .buzzer-team-row.ok .buz-team-state { color: #7CFC9A; }
+  .buzzer-status-global { color: rgba(255,255,255,0.75); font-size: 13px; text-align: center; padding: 4px; }
+  .buzzer-next-btn {
+    background: linear-gradient(135deg, var(--gold), #b8860b);
+    color: #1a0004; border: none; border-radius: 16px;
+    padding: 14px 36px; font-size: 16px; font-weight: 900;
+    cursor: pointer; letter-spacing: 1px;
+    box-shadow: 0 8px 24px rgba(248,192,36,0.3);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .buzzer-next-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(248,192,36,0.45); }
+</style>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 </head>
 <body>
@@ -965,6 +1007,33 @@
   </div>
 </div>
 
+<!-- Man hinh ket noi chuong qua dien thoai -->
+<div class="buzzer-overlay" id="buzzerOverlay">
+  <div class="buzzer-card">
+    <div class="buzzer-title">🔔 KẾT NỐI CHUÔNG QUA ĐIỆN THOẠI</div>
+    <div class="buzzer-sub">Mỗi đội mở link dưới đây trên điện thoại để bấm chuông giành quyền trả lời</div>
+    <div class="buzzer-body">
+      <div class="buzzer-qr-wrap">
+        <img id="buzzerQr" class="buzzer-qr" alt="QR code trang buzzer">
+        <div class="buzzer-link" id="buzzerLink"></div>
+      </div>
+      <div class="buzzer-status-col">
+        <div class="buzzer-team-row" id="buzRowA">
+          <span class="buz-dot" id="buzDotA">&#128308;</span>
+          <span class="buz-team-label">Đội A</span>
+          <span class="buz-team-state" id="buzStateA">chưa kết nối</span>
+        </div>
+        <div class="buzzer-team-row" id="buzRowB">
+          <span class="buz-dot" id="buzDotB">&#128308;</span>
+          <span class="buz-team-label">Đội B</span>
+          <span class="buz-team-state" id="buzStateB">chưa kết nối</span>
+        </div>
+        <div class="buzzer-status-global" id="buzGlobal"></div>
+      </div>
+    </div>
+    <button class="buzzer-next-btn" onclick="buzzerContinue()">📚 Chọn bộ câu hỏi &#8594;</button>
+  </div>
+</div>
 <!-- Panel chọn bộ câu hỏi -->
 <div class="set-panel-overlay" id="setPanelOverlay">
   <div class="set-panel-card">
@@ -1289,8 +1358,8 @@ function startDisplay() {
   wrongPicks = [];
   isAnswered = false;
   strikeCount = 0;
-  // Đi tới màn hình chọn bộ câu hỏi trước
-  openSetPanel();
+  // Di toi man hinh ket noi chuong truoc
+  openBuzzerPanel();
 }
 
 function renderQuestion() {
@@ -2231,16 +2300,36 @@ function initFlagWaves() {
 // ============ CHUONG GIANNH QUYEN (2 dien thoai qua internet) ============
 function buzzStatusUpdate() {
   const el = document.getElementById('buzzStatus');
-  if (!el) return;
-  if (typeof mqtt === 'undefined') { el.textContent = BUZZ_TXT_ERR; return; }
-  if (!buzzConnected) { el.textContent = BUZZ_TXT_WAIT; return; }
-  const now = Date.now();
-  const a = (now - buzzLastSeen.A) < 8000;
-  const b = (now - buzzLastSeen.B) < 8000;
-  if (a && b) { el.textContent = BUZZ_TXT_BOTH; }
-  else if (a) { el.textContent = BUZZ_TXT_A; }
-  else if (b) { el.textContent = BUZZ_TXT_B; }
-  else { el.textContent = BUZZ_TXT_NONE; }
+  const gEl = document.getElementById('buzGlobal');
+  let text = '';
+  if (typeof mqtt === 'undefined') { text = BUZZ_TXT_ERR; }
+  else if (!buzzConnected) { text = BUZZ_TXT_WAIT; }
+  else {
+    const now = Date.now();
+    const a = (now - buzzLastSeen.A) < 8000;
+    const b = (now - buzzLastSeen.B) < 8000;
+    if (a && b) { text = BUZZ_TXT_BOTH; }
+    else if (a) { text = BUZZ_TXT_A; }
+    else if (b) { text = BUZZ_TXT_B; }
+    else { text = BUZZ_TXT_NONE; }
+  }
+  if (el) { el.textContent = text; }
+  if (gEl) { gEl.textContent = text; }
+  const now2 = Date.now();
+  const aOn = (now2 - buzzLastSeen.A) < 8000;
+  const bOn = (now2 - buzzLastSeen.B) < 8000;
+  const dotA = document.getElementById('buzDotA');
+  const stA = document.getElementById('buzStateA');
+  const rowA = document.getElementById('buzRowA');
+  if (dotA) { dotA.textContent = aOn ? '\u{1F7E2}' : '\u{1F534}'; }
+  if (stA) { stA.textContent = aOn ? BUZZ_TXT_OK2 : BUZZ_TXT_NO2; }
+  if (rowA) { if (aOn) { rowA.classList.add('ok'); } else { rowA.classList.remove('ok'); } }
+  const dotB = document.getElementById('buzDotB');
+  const stB = document.getElementById('buzStateB');
+  const rowB = document.getElementById('buzRowB');
+  if (dotB) { dotB.textContent = bOn ? '\u{1F7E2}' : '\u{1F534}'; }
+  if (stB) { stB.textContent = bOn ? BUZZ_TXT_OK2 : BUZZ_TXT_NO2; }
+  if (rowB) { if (bOn) { rowB.classList.add('ok'); } else { rowB.classList.remove('ok'); } }
 }
 function buzzPublish(obj) {
   try { if (buzzClient && buzzConnected) buzzClient.publish(BUZZ_TOPIC, JSON.stringify(obj)); } catch (e) {}
@@ -2343,7 +2432,21 @@ function buzzPassTurn() {
     buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 3500);
   }
   buzzPublish({ action: 'lock', team: other });
+}const BUZZ_TXT_OK2 = 'đã kết nối';
+const BUZZ_TXT_NO2 = 'chưa kết nối';
+function openBuzzerPanel() {
+  const buzzerUrl = new URL('buzzer.html', location.href).href;
+  document.getElementById('buzzerLink').textContent = buzzerUrl;
+  document.getElementById('buzzerQr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(buzzerUrl);
+  document.getElementById('buzzerOverlay').classList.add('show');
+  buzzStatusUpdate();
 }
+function buzzerContinue() {
+  soundClick();
+  document.getElementById('buzzerOverlay').classList.remove('show');
+  openSetPanel();
+}
+
 buzzConnect();
 setInterval(buzzStatusUpdate, 1000);
 initFlagWaves();
