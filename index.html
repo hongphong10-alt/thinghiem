@@ -943,6 +943,9 @@
   .buzzer-team-row { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 16px; }
   .buz-dot { font-size: 20px; }
   .buz-team-label { color: #fff; font-weight: 800; font-size: 15px; }
+  .buz-name-edit { outline: none; border-bottom: 1px dashed transparent; transition: border-color 0.2s; }
+  .buz-name-edit:hover { border-bottom-color: rgba(248,192,36,0.6); }
+  .buz-name-edit:focus { border-bottom-color: var(--gold); background: rgba(248,192,36,0.1); border-radius: 4px; padding: 0 4px; }
   .buz-team-state { color: rgba(255,255,255,0.6); font-size: 13px; margin-left: auto; }
   .buzzer-team-row.ok .buz-team-state { color: #7CFC9A; }
   .buzzer-status-global { color: rgba(255,255,255,0.75); font-size: 13px; text-align: center; padding: 4px; }
@@ -1017,12 +1020,12 @@
       <div class="buzzer-status-col">
         <div class="buzzer-team-row" id="buzRowA">
           <span class="buz-dot" id="buzDotA">&#128308;</span>
-          <span class="buz-team-label">Đội A</span>
+          <span class="buz-team-label buz-name-edit" id="buzNameA" contenteditable="true" spellcheck="false">Đội A</span>
           <span class="buz-team-state" id="buzStateA">chưa kết nối</span>
         </div>
         <div class="buzzer-team-row" id="buzRowB">
           <span class="buz-dot" id="buzDotB">&#128308;</span>
-          <span class="buz-team-label">Đội B</span>
+          <span class="buz-team-label buz-name-edit" id="buzNameB" contenteditable="true" spellcheck="false">Đội B</span>
           <span class="buz-team-state" id="buzStateB">chưa kết nối</span>
         </div>
         <div class="buzzer-status-global" id="buzGlobal"></div>
@@ -1062,9 +1065,9 @@
 
   <div class="question-area">
     <div class="buzz-panel" id="buzzPanel">
-      <div class="buzz-team" id="buzzTeamA"><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span><span class="buzz-name">ĐỘI A</span><span class="buzz-score" id="buzzScoreA">0</span></div>
+      <div class="buzz-team" id="buzzTeamA"><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span><span class="buzz-name buz-name-edit" id="buzzPanelNameA" contenteditable="true" spellcheck="false">ĐỘI A</span><span class="buzz-score" id="buzzScoreA">0</span></div>
       <div class="buzz-status" id="buzzStatus">🟡 Chuông: đang kết nối...</div>
-      <div class="buzz-team" id="buzzTeamB"><span class="buzz-name">ĐỘI B</span><span class="buzz-score" id="buzzScoreB">0</span><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span></div>
+      <div class="buzz-team" id="buzzTeamB"><span class="buzz-name buz-name-edit" id="buzzPanelNameB" contenteditable="true" spellcheck="false">ĐỘI B</span><span class="buzz-score" id="buzzScoreB">0</span><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span></div>
     </div>
     <div class="q-counter">
       <div class="q-label">CÂU HỎI SỐ</div>
@@ -1137,7 +1140,20 @@ let buzzRingTimer = null;
 let buzzSirenNodes = [];
 let buzzSirenStopTimer = null;
 const buzzScore = { A: 0, B: 0 };
-const BUZZ_PASS_TEXT = 'ĐỘI X TRẢ LỜI TIẾP!';
+let buzzNameA = 'Đội A';
+let buzzNameB = 'Đội B';
+function getBuzzName(team) { return team === 'A' ? buzzNameA : buzzNameB; }
+function buzzNameSync() {
+  const la = document.getElementById('buzNameA');
+  const lb = document.getElementById('buzNameB');
+  const pa = document.getElementById('buzzPanelNameA');
+  const pb = document.getElementById('buzzPanelNameB');
+  if (la) la.textContent = buzzNameA;
+  if (lb) lb.textContent = buzzNameB;
+  if (pa) pa.textContent = buzzNameA.toUpperCase();
+  if (pb) pb.textContent = buzzNameB.toUpperCase();
+}
+const BUZZ_PASS_TEXT = 'X TRẢ LỜI TIẾP!';
 let buzzBannerTimer = null;
 const BUZZ_TOPIC = 'hoithi-chungkhao-buzzer-2026';
 const BUZZ_BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
@@ -1145,7 +1161,7 @@ const BUZZ_TXT_BOTH = '🟢 Chuông: 2 đội đã kết nối';
 const BUZZ_TXT_A = '🟢 Chuông: Đội A đã kết nối';
 const BUZZ_TXT_B = '🟢 Chuông: Đội B đã kết nối';
 const BUZZ_TXT_NONE = '🟡 Chuông: chưa có đội kết nối';
-const BUZZ_WIN_TEXT = 'ĐỘI X GIÀNH QUYỀN TRẢ LỜI!';
+const BUZZ_WIN_TEXT = 'X GIÀNH QUYỀN TRẢ LỜI!';
 const BUZZ_TXT_OK = '🟢 Chuông: đã kết nối';
 const BUZZ_TXT_WAIT = '🟡 Chuông: đang kết nối...';
 const BUZZ_TXT_ERR = '⚠ Chuông: lổi thư viện';
@@ -2306,8 +2322,8 @@ function buzzStatusUpdate() {
     const a = (now - buzzLastSeen.A) < 8000;
     const b = (now - buzzLastSeen.B) < 8000;
     if (a && b) { text = BUZZ_TXT_BOTH; }
-    else if (a) { text = BUZZ_TXT_A; }
-    else if (b) { text = BUZZ_TXT_B; }
+    else if (a) { text = BUZZ_TXT_A.replace('Đội A', buzzNameA); }
+    else if (b) { text = BUZZ_TXT_B.replace('Đội B', buzzNameB); }
     else { text = BUZZ_TXT_NONE; }
   }
   if (el) { el.textContent = text; }
@@ -2377,7 +2393,7 @@ function buzzWin(team) {
   const banner = document.getElementById('buzzBanner');
   const text = document.getElementById('buzzBannerText');
   if (banner && text) {
-    text.textContent = BUZZ_WIN_TEXT.replace('X', team);
+    text.textContent = BUZZ_WIN_TEXT.replace('X', getBuzzName(team).toUpperCase());
     banner.classList.add('show');
     if (buzzBannerTimer) clearTimeout(buzzBannerTimer);
     buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 4500);
@@ -2423,7 +2439,7 @@ function buzzPassTurn() {
   const banner = document.getElementById('buzzBanner');
   const text = document.getElementById('buzzBannerText');
   if (banner && text) {
-    text.textContent = BUZZ_PASS_TEXT.replace('X', other);
+    text.textContent = BUZZ_PASS_TEXT.replace('X', getBuzzName(other).toUpperCase());
     banner.classList.add('show');
     if (buzzBannerTimer) clearTimeout(buzzBannerTimer);
     buzzBannerTimer = setTimeout(() => { banner.classList.remove("show"); }, 3500);
@@ -2443,6 +2459,39 @@ function buzzerContinue() {
   document.getElementById('buzzerOverlay').classList.remove('show');
   openSetPanel();
 }
+function buzzNameEditInit() {
+  [['buzNameA','A'],['buzNameB','B']].forEach(function(pair) {
+    const el = document.getElementById(pair[0]);
+    if (!el) return;
+    el.addEventListener('input', function() {
+      const v = el.textContent.replace(/\s+/g, ' ').trim();
+      if (pair[1] === 'A') { buzzNameA = v || 'Đội A'; } else { buzzNameB = v || 'Đội B'; }
+      buzzNameSync();
+    });
+    el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+    el.addEventListener('paste', function(e) {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' ').trim();
+      document.execCommand('insertText', false, t);
+    });
+  });
+  [['buzzPanelNameA','A'],['buzzPanelNameB','B']].forEach(function(pair) {
+    const el = document.getElementById(pair[0]);
+    if (!el) return;
+    el.addEventListener('input', function() {
+      const v = el.textContent.replace(/\s+/g, ' ').trim();
+      if (pair[1] === 'A') { buzzNameA = v || 'Đội A'; } else { buzzNameB = v || 'Đội B'; }
+      buzzNameSync();
+    });
+    el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+    el.addEventListener('paste', function(e) {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text').replace(/\s+/g, ' ').trim();
+      document.execCommand('insertText', false, t);
+    });
+  });
+}
+buzzNameEditInit();
 
 buzzConnect();
 setInterval(buzzStatusUpdate, 1000);
