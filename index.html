@@ -899,15 +899,23 @@
   .buzz-team { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 8px 14px; transition: all 0.25s ease; }
   .buzz-name { font-size: clamp(18px, 2.2vw, 28px); font-weight: 900; letter-spacing: 2px; color: #fff; }
   .buzz-score { min-width: 46px; text-align: center; font-size: clamp(18px, 2vw, 26px); font-weight: 900; color: #ffd700; background: rgba(0,0,0,0.35); border: 2px solid rgba(255,215,0,0.45); border-radius: 12px; padding: 4px 10px; margin-left: 6px; }
-  .buzz-lamp { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; font-size: clamp(24px, 2.8vw, 36px); filter: grayscale(1) brightness(0.55); transition: filter 0.2s ease; }
-  .lamp-emoji { position: relative; z-index: 1; }
-  .lamp-beam { position: absolute; left: 50%; top: 50%; width: 2.7em; height: 2.7em; margin: -1.35em 0 0 -1.35em; border-radius: 50%; background: conic-gradient(rgba(0,0,0,0) 0deg, rgba(0,0,0,0) 55deg, rgba(255,45,45,0.95) 78deg, rgba(255,45,45,0.5) 90deg, rgba(255,45,45,0.95) 102deg, rgba(0,0,0,0) 125deg, rgba(0,0,0,0) 235deg, rgba(255,45,45,0.95) 258deg, rgba(255,45,45,0.5) 270deg, rgba(255,45,45,0.95) 282deg, rgba(0,0,0,0) 305deg); -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); mask-image: radial-gradient(circle, rgba(0,0,0,0) 20%, #000 48%, rgba(0,0,0,0) 74%); opacity: 0; pointer-events: none; }
-  .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.7s ease-in-out infinite; }
-  .buzz-team.lit .buzz-lamp { filter: none; }
-  .buzz-team.lit .lamp-beam { opacity: 0.95; animation: beamSpin 0.7s linear infinite, beamHue 0.7s steps(1) infinite; }
+  .buzz-lamp { position: relative; display: inline-flex; align-items: flex-end; justify-content: center; width: 2.2em; height: 2.6em; font-size: clamp(24px, 2.8vw, 36px); }
+  .lamp-emoji { display: none; }
+  .beacon-body { position: relative; width: 100%; height: 100%; }
+  .beacon-dome { position: absolute; bottom: 18%; left: 50%; transform: translateX(-50%); width: 72%; height: 58%; background: radial-gradient(ellipse at 38% 28%, rgba(255,120,120,0.95), rgba(200,20,20,0.9) 55%, rgba(120,8,8,0.95)); border-radius: 50% 50% 42% 42%; box-shadow: inset 0 -4px 8px rgba(0,0,0,0.45), inset 0 3px 6px rgba(255,200,200,0.4), 0 0 10px rgba(255,30,30,0.4); overflow: hidden; z-index: 2; filter: brightness(0.55) saturate(0.6); transition: filter 0.2s; }
+  .beacon-dome::before { content: ''; position: absolute; top: 8%; left: 14%; width: 30%; height: 34%; background: radial-gradient(ellipse, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); border-radius: 50%; }
+  .beacon-rotor { position: absolute; bottom: 22%; left: 50%; width: 54%; height: 44%; transform: translateX(-50%); z-index: 3; }
+  .beacon-rotor::before { content: ''; position: absolute; inset: 0; background: conic-gradient(rgba(255,0,0,0) 0deg, rgba(255,60,60,0.95) 18deg, rgba(255,180,180,1) 28deg, rgba(255,60,60,0.95) 38deg, rgba(255,0,0,0) 56deg); border-radius: 50%; animation: rotorSpin 0.55s linear infinite; opacity: 0; transition: opacity 0.15s; }
+  .beacon-base { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 86%; height: 20%; background: linear-gradient(180deg, #3a3a3a, #1a1a1a 60%, #111); border-radius: 4px 4px 6px 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.6); z-index: 1; }
+  .beacon-base::before { content: ''; position: absolute; top: 15%; left: 8%; right: 8%; height: 28%; background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0)); border-radius: 2px; }
+  .beacon-glow { position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); width: 240%; height: 240%; border-radius: 50%; background: radial-gradient(circle, rgba(255,30,30,0.55), rgba(255,30,30,0.18) 40%, transparent 70%); opacity: 0; pointer-events: none; z-index: 0; animation: glowPulse 0.55s linear infinite; }
+  .buzz-team.lit .beacon-dome { filter: none; }
+  .buzz-team.lit .beacon-rotor::before { opacity: 1; }
+  .buzz-team.lit .beacon-glow { opacity: 1; }
+  .buzz-team.lit { border-color: #ff3b30; animation: beaconFlash 0.55s ease-in-out infinite; }
+  @keyframes rotorSpin { from { transform: translateX(-50%) rotate(0deg); } to { transform: translateX(-50%) rotate(360deg); } }
+  @keyframes glowPulse { 0%, 100% { opacity: 0.25; } 14% { opacity: 1; } 28% { opacity: 0.25; } 50% { opacity: 0.25; } 64% { opacity: 1; } 78% { opacity: 0.25; } }
   @keyframes beaconFlash { 0%, 100% { border-color: #ff3b30; box-shadow: 0 0 14px rgba(255,40,40,0.6); background: rgba(255,59,48,0.12); } 50% { border-color: #2f7bff; box-shadow: 0 0 38px rgba(47,123,255,0.95); background: rgba(47,123,255,0.22); } }
-  @keyframes beamSpin { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-  @keyframes beamHue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(240deg); } }
   .buzz-status { align-self: center; font-size: clamp(12px, 1.4vw, 16px); color: rgba(255,255,255,0.75); white-space: nowrap; }
   .buzz-banner { position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-160%); z-index: 9000; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #ffe27a, #ffb300); color: #1a1a1a; font-weight: 900; font-size: clamp(18px, 2.4vw, 32px); padding: 12px 30px; border-radius: 999px; box-shadow: 0 10px 40px rgba(0,0,0,0.55), 0 0 30px rgba(255,215,0,0.7); transition: transform 0.35s cubic-bezier(0.2, 1.4, 0.4, 1); pointer-events: none; white-space: nowrap; }
   .buzz-banner.show { transform: translateX(-50%) translateY(0); }
@@ -1065,9 +1073,9 @@
 
   <div class="question-area">
     <div class="buzz-panel" id="buzzPanel">
-      <div class="buzz-team" id="buzzTeamA"><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span><span class="buzz-name buz-name-edit" id="buzzPanelNameA" contenteditable="true" spellcheck="false">ĐỘI A</span><span class="buzz-score" id="buzzScoreA">0</span></div>
+      <div class="buzz-team" id="buzzTeamA"><span class="buzz-lamp"><span class="beacon-glow"></span><span class="beacon-body"><span class="beacon-dome"></span><span class="beacon-rotor"></span><span class="beacon-base"></span></span></span><span class="buzz-name buz-name-edit" id="buzzPanelNameA" contenteditable="true" spellcheck="false">ĐỘI A</span><span class="buzz-score" id="buzzScoreA">0</span></div>
       <div class="buzz-status" id="buzzStatus">🟡 Chuông: đang kết nối...</div>
-      <div class="buzz-team" id="buzzTeamB"><span class="buzz-name buz-name-edit" id="buzzPanelNameB" contenteditable="true" spellcheck="false">ĐỘI B</span><span class="buzz-score" id="buzzScoreB">0</span><span class="buzz-lamp"><span class="lamp-beam"></span><span class="lamp-emoji">🚨</span></span></div>
+      <div class="buzz-team" id="buzzTeamB"><span class="buzz-name buz-name-edit" id="buzzPanelNameB" contenteditable="true" spellcheck="false">ĐỘI B</span><span class="buzz-score" id="buzzScoreB">0</span><span class="buzz-lamp"><span class="beacon-glow"></span><span class="beacon-body"><span class="beacon-dome"></span><span class="beacon-rotor"></span><span class="beacon-base"></span></span></span></div>
     </div>
     <div class="q-counter">
       <div class="q-label">CÂU HỎI SỐ</div>
@@ -2341,6 +2349,7 @@ function buzzConnect() {
     buzzConnected = true;
     buzzStatusUpdate();
     try { buzzClient.subscribe(BUZZ_TOPIC); } catch (e) {}
+    buzzPublish({ action: 'ping' });
   });
   buzzClient.on('close', () => { buzzConnected = false; buzzStatusUpdate(); });
   buzzClient.on('offline', () => { buzzConnected = false; buzzStatusUpdate(); });

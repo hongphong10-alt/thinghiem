@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Chuồng giành quyền trả lời</title>
+<title>Chuông giành quyền trả lời</title>
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -25,7 +25,7 @@
 </head>
 <body>
   <div id="setup">
-    <div class="ttl">🔔 Chuồng giành quyền trả lời</div>
+    <div class="ttl">🔔 Chuông giành quyền trả lời</div>
     <div class="sub">Chọn đội của bạn:</div>
     <button class="team-btn" onclick="pickTeam('A')">ĐỘI A</button>
     <button class="team-btn" onclick="pickTeam('B')">ĐỘI B</button>
@@ -70,6 +70,7 @@ function connect() {
     let d = null;
     try { d = JSON.parse(msg.toString()); } catch (e) { return; }
     if (!d) return;
+    if (d.action === 'ping') { publishHi(); return; }
     if (d.action === 'lock') {
       winner = d.team;
       locked = (d.team === myTeam);
@@ -89,6 +90,19 @@ function connect() {
   });
 }
 function nextBroker() { bIdx++; setTimeout(connect, 1500); }
+function forceReconnect() {
+  if (!myTeam) return;
+  if (client) { try { client.end(true); } catch (e) {} client = null; }
+  connected = false; setSt();
+  connect();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (!connected) forceReconnect(); else publishHi();
+  }
+});
+window.addEventListener('online', () => { if (!connected) forceReconnect(); });
+setInterval(() => { if (myTeam && !connected && !client) connect(); }, 5000);
 btn.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   btn.classList.add('pressed');
