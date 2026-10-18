@@ -1137,7 +1137,7 @@ let buzzLastSeen = { A: 0, B: 0 };
 let buzzLock = false;
 let buzzTeam = null;
 let buzzRingTimer = null;
-let buzzSirenNodes = [];
+let ringAudio = null;
 let buzzSirenStopTimer = null;
 const buzzScore = { A: 0, B: 0 };
 let buzzNameA = 'Đội A';
@@ -1279,41 +1279,17 @@ function soundBuzzBell() {
 function soundBuzzRingStart() {
   soundBuzzRingStop();
   if (!soundEnabled || audioMuted) return;
-  const ctx = getAudioCtx(); if (!ctx) return;
-  const gain = ctx.createGain();
-  const o1 = ctx.createOscillator();
-  const o2 = ctx.createOscillator();
-  const tr = ctx.createOscillator();
-  const tg = ctx.createGain();
-  o1.type = 'square'; o1.frequency.value = 1180;
-  o2.type = 'square'; o2.frequency.value = 985;
-  tr.type = 'sine'; tr.frequency.value = 22;
-  tg.gain.value = 0.07;
-  gain.gain.setValueAtTime(0.08, ctx.currentTime);
-  tr.connect(tg); tg.connect(gain.gain);
-  o1.connect(gain); o2.connect(gain);
-  gain.connect(ctx.destination);
-  o1.start(); o2.start(); tr.start();
-  buzzSirenNodes = [o1, o2, tr, gain];
+  if (!ringAudio) { ringAudio = new Audio('chuong-het-gio.mp3'); ringAudio.preload = 'auto'; }
+  ringAudio.currentTime = 0;
+  ringAudio.volume = 1;
+  ringAudio.play().catch(() => {});
   buzzRingTimer = setInterval(() => { if (audioMuted) soundBuzzRingStop(); }, 200);
   buzzSirenStopTimer = setTimeout(soundBuzzRingStop, 3000);
 }
 function soundBuzzRingStop() {
   if (buzzRingTimer) { clearInterval(buzzRingTimer); buzzRingTimer = null; }
   if (buzzSirenStopTimer) { clearTimeout(buzzSirenStopTimer); buzzSirenStopTimer = null; }
-  if (buzzSirenNodes && buzzSirenNodes.length) {
-    try {
-      const g = buzzSirenNodes[3];
-      const t = getAudioCtx().currentTime;
-      g.gain.cancelScheduledValues(t);
-      g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-      buzzSirenNodes[0].stop(t + 0.15);
-      buzzSirenNodes[1].stop(t + 0.15);
-      buzzSirenNodes[2].stop(t + 0.15);
-    } catch (e) {}
-    buzzSirenNodes = [];
-  }
+  if (ringAudio) { try { ringAudio.pause(); ringAudio.currentTime = 0; } catch (e) {} }
 }
 function soundReveal() {
   if (!soundEnabled) return;
